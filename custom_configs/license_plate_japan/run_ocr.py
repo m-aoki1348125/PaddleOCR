@@ -91,11 +91,11 @@ class SimpleLicensePlateOCR:
             print("PaddleOCRを初期化中...")
 
         ocr_params = {
-            'use_angle_cls': False,
+            'use_textline_orientation': False,  # 更新されたパラメータ名
             'lang': 'japan',
-            'use_gpu': use_gpu,
-            'show_log': False,
-            'rec_char_dict_path': str(SCRIPT_DIR / 'license_plate_dict.txt')
+            'device': 'gpu' if use_gpu else 'cpu'  # PaddleOCR 3.x の新しいパラメータ
+            # 注: PaddleOCR 3.x ではrec_char_dict_pathがサポートされていないため、
+            # カスタム辞書は後処理で対応
         }
 
         # カスタムモデルを指定
@@ -139,7 +139,7 @@ class SimpleLicensePlateOCR:
 
         # OCR実行
         try:
-            results = self.ocr.ocr(image, cls=False)
+            results = self.ocr.predict(image)
         except Exception as e:
             return {
                 'success': False,
@@ -147,16 +147,37 @@ class SimpleLicensePlateOCR:
                 'image_path': image_path
             }
 
-        if not results or not results[0]:
+        # PaddleOCR 3.x の結果形式を処理（リストの最初の要素が辞書）
+        if not results or not isinstance(results, list) or len(results) == 0:
             return {
                 'success': False,
                 'error': 'テキストが検出されませんでした',
                 'image_path': image_path
             }
 
-        # 最も信頼度の高い結果を選択
-        best_result = max(results[0], key=lambda x: x[1][1])
-        text, confidence = best_result[1]
+        result_dict = results[0]
+        if 'rec_texts' not in result_dict:
+            return {
+                'success': False,
+                'error': 'テキストが検出されませんでした',
+                'image_path': image_path
+            }
+
+        # テキストと信頼度を抽出
+        texts = result_dict['rec_texts']
+        scores = result_dict['rec_scores']
+
+        if not texts:
+            return {
+                'success': False,
+                'error': 'テキストが検出されませんでした',
+                'image_path': image_path
+            }
+
+        # すべてのテキストを結合（スペース区切り）
+        text = ' '.join(texts)
+        # 平均信頼度を計算
+        confidence = sum(scores) / len(scores)
 
         if self.verbose:
             print(f"  ✓ OCR実行完了: {text} (信頼度: {confidence:.2%})")
