@@ -2,15 +2,33 @@
 
 PaddleOCRを使用して、パトカー車載カメラから取得した日本のナンバープレート画像を高精度に認識するための実装ガイドです。
 
+## 🚀 すぐに使いたい方へ
+
+**ファインチューニング不要で、すぐに使える実装を用意しています！**
+
+👉 **[クイックスタートガイド (QUICKSTART.md)](./QUICKSTART.md)** をご覧ください。
+
+事前学習モデル + 前後処理により、データセット準備や学習なしで高精度な認識が可能です：
+
+```bash
+# 3つのコマンドで開始
+pip install paddleocr opencv-python
+bash custom_configs/license_plate_japan/download_models.sh
+python custom_configs/license_plate_japan/run_ocr.py your_image.jpg
+```
+
+---
+
 ## 目次
 
 1. [概要](#概要)
-2. [システム要件](#システム要件)
-3. [セットアップ](#セットアップ)
-4. [使用方法](#使用方法)
-5. [ファインチューニング](#ファインチューニング)
-6. [精度向上のヒント](#精度向上のヒント)
-7. [トラブルシューティング](#トラブルシューティング)
+2. [2つのアプローチ](#2つのアプローチ)
+3. [システム要件](#システム要件)
+4. [セットアップ](#セットアップ)
+5. [使用方法](#使用方法)
+6. [ファインチューニング](#ファインチューニング)
+7. [精度向上のヒント](#精度向上のヒント)
+8. [トラブルシューティング](#トラブルシューティング)
 
 ---
 
@@ -21,11 +39,53 @@ PaddleOCRを使用して、パトカー車載カメラから取得した日本�
 - ナンバープレート部分を切り出し済み
 - 専用の超解像処理を適用済み
 
-### アプローチ
-1. **カスタム辞書**: ナンバープレートで使用される文字のみに限定
-2. **前処理**: 超解像処理後の画像を最適化
-3. **ファインチューニング**: 日本語PP-OCRv3モデルをベースに学習
+### 主な機能
+1. **カスタム辞書**: ナンバープレートで使用される文字のみに限定（約200文字）
+2. **前処理**: 超解像処理後の画像を最適化（ノイズ除去、コントラスト強調、シャープニング）
+3. **認識**: 日本語PP-OCRv3モデルを使用
 4. **後処理**: ナンバープレートフォーマットに基づく検証・補正
+
+---
+
+## 2つのアプローチ
+
+### 🎯 アプローチ1: 事前学習モデル + 前後処理（推奨）
+
+**特徴:**
+- ✅ データセット準備不要
+- ✅ 学習時間ゼロ
+- ✅ すぐに使える
+- ✅ 高精度（90%以上の認識率を期待）
+
+**適用シーン:**
+- 画像品質が良好（超解像処理済み）
+- 迅速な導入が必要
+- データセットが少ない（500枚未満）
+
+**使用方法:**
+```bash
+python custom_configs/license_plate_japan/run_ocr.py your_image.jpg
+```
+
+詳細は **[QUICKSTART.md](./QUICKSTART.md)** を参照。
+
+---
+
+### 🎓 アプローチ2: ファインチューニング
+
+**特徴:**
+- 🎯 最高精度（95%以上の認識率を期待）
+- 🎯 ドメイン特化型モデル
+- ⚠️ データセット準備が必要（最低500枚、推奨5,000枚）
+- ⚠️ 学習時間が必要（数時間～数日）
+
+**適用シーン:**
+- 最高精度が必要
+- 十分なデータセットがある（500枚以上）
+- 特殊な撮影条件や画像特性
+
+**使用方法:**
+このドキュメントの [ファインチューニング](#ファインチューニング) セクションを参照。
 
 ---
 
@@ -73,58 +133,73 @@ pip install opencv-python numpy
 PaddleOCR/
 └── custom_configs/
     └── license_plate_japan/
-        ├── README.md                    # このファイル
+        ├── README.md                    # このファイル（完全ガイド）
+        ├── QUICKSTART.md                # クイックスタートガイド
         ├── license_plate_dict.txt       # カスタム辞書
-        ├── license_plate_rec.yml        # 学習設定ファイル
+        ├── license_plate_rec.yml        # 学習設定ファイル（ファインチューニング用）
         ├── preprocessing.py             # 前処理スクリプト
         ├── postprocessing.py            # 後処理スクリプト
-        └── inference.py                 # 推論スクリプト
+        ├── run_ocr.py                   # エンドツーエンド推論スクリプト（推奨）
+        ├── inference.py                 # 詳細推論スクリプト
+        ├── download_models.sh           # モデルダウンロードスクリプト
+        └── create_test_image.py         # テスト画像生成スクリプト
 ```
 
 ---
 
 ## 使用方法
 
-### クイックスタート（事前学習モデルを使用）
+### 🚀 クイックスタート（事前学習モデル + 前後処理）
 
-事前学習済みの日本語モデルを使って、すぐに推論を試すことができます。
+**最も簡単な方法** - データセット不要、学習不要で、すぐに使えます。
+
+#### ステップ1: モデルのダウンロード（オプション）
+
+```bash
+# 初回実行時は自動ダウンロードされますが、事前にダウンロードも可能
+bash custom_configs/license_plate_japan/download_models.sh
+```
+
+#### ステップ2: 推論の実行
 
 ```bash
 # 単一画像の認識
-python custom_configs/license_plate_japan/inference.py \
-    /path/to/license_plate_image.jpg
+python custom_configs/license_plate_japan/run_ocr.py your_image.jpg
 
 # ディレクトリ内の全画像を一括処理
-python custom_configs/license_plate_japan/inference.py \
-    /path/to/images/ \
-    --output_csv results.csv
+python custom_configs/license_plate_japan/run_ocr.py images/ --output_csv results.csv
 ```
 
-### 推論オプション
+詳細は **[QUICKSTART.md](./QUICKSTART.md)** を参照してください。
+
+---
+
+### 📊 詳細推論（inference.py）
+
+より細かい制御が必要な場合は、`inference.py` を使用：
 
 ```bash
+# 基本的な使用
+python custom_configs/license_plate_japan/inference.py image.jpg
+
+# 詳細オプション
 python custom_configs/license_plate_japan/inference.py \
     /path/to/image.jpg \
-    --rec_model_dir ./output/license_plate_japan_rec/best_accuracy \  # カスタムモデル
+    --rec_model_dir ./output/license_plate_japan_rec/best_accuracy \
     --rec_char_dict_path custom_configs/license_plate_japan/license_plate_dict.txt \
-    --min_confidence 0.7 \  # 最小信頼度スコア
-    --no_preprocessing \    # 前処理を無効化
-    --no_postprocessing \   # 後処理を無効化
-    --no_gpu                # CPUを使用
+    --min_confidence 0.7 \
+    --no_preprocessing \
+    --no_postprocessing \
+    --no_gpu
 ```
 
-### 前処理のみを実行
+### 🔧 前処理・後処理の個別実行
 
 ```bash
-python custom_configs/license_plate_japan/preprocessing.py \
-    input_image.jpg \
-    output_image.jpg
-```
+# 前処理のみ（画像の前処理効果を確認）
+python custom_configs/license_plate_japan/preprocessing.py input.jpg output.jpg
 
-### 後処理のテスト
-
-```bash
-# 後処理スクリプトを直接実行してテストケースを確認
+# 後処理のテスト（テストケースを実行）
 python custom_configs/license_plate_japan/postprocessing.py
 ```
 
